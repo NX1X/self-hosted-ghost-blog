@@ -1,0 +1,19 @@
+# zizmor configuration - https://docs.zizmor.sh/configuration/
+#
+# Ignore `ref-version-mismatch`. Every GitHub Action here is digest-pinned and
+# managed by Renovate, which labels each pin with the MAJOR version (e.g. `# v7`)
+# while the SHA tracks a specific patch release. When the major tag advances,
+# zizmor reports the comment/SHA drift as a mismatch - but the pins are correct
+# and Renovate-controlled, so the finding is noise (and would recur on every
+# action bump). All other zizmor audits stay fully enabled.
+rules:
+  ref-version-mismatch:
+    ignore:
+      - backup.yml
+      - codeql.yml
+      - dependency-review.yml
+      - deploy.yml
+      - gitleaks.yml
+      - lint.yml
+      - trivy.yml
+      - zizmor.yml
