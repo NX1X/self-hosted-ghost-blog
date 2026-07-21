@@ -1,0 +1,87 @@
+name: Backup
+
+# Nightly off-site backup to Cloudflare R2 (S3-compatible, zero egress fees).
+# Reaches the server over the same Cloudflare Tunnel used for deploys, dumps the
+# databases + Ghost content, ships the bundle to R2 with
+# NX1X/Cloudflare-R2-backup-action, then prunes old backups by retention.
+#
+# Required repository secrets:
+#   CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET   Cloudflare Access service token
+#   DEPLOY_SSH_KEY / DEPLOY_SSH_HOST                 tunnel SSH access (as in deploy.yml)
+#   DATABASE_ROOT_PASSWORD                           MySQL root password (matches the server .env)
+#   CF_ACCOUNT_ID                                    Cloudflare account id
+#   R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY          R2 API token
+# Required repository variable:
+#   R2_BUCKET                                        target R2 bucket name
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # daily at 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Set up SSH over Cloudflare Tunnel
+        uses: NX1X/cloudflare-tunnel-ssh-action@5b09bfc4ba3dc20b3d77d96271fff5a20fe64107 # v1.0.0
+        with:
+          cf-access-client-id: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          cf-access-client-secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          ssh-host: ${{ secrets.DEPLOY_SSH_HOST }}
+          ssh-user: ${{ vars.DEPLOY_SSH_USER || 'deploy' }}
+
+      - name: Dump databases + content on the server and fetch the bundle
+        env:
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ vars.DEPLOY_SSH_USER || 'deploy' }}
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/opt/ghost-blog' }}
+          DB_ROOT_PW: ${{ secrets.DATABASE_ROOT_PASSWORD }}
+        run: |
+          STAMP="$(date -u +%Y%m%d-%H%M%S)"
+          BUNDLE="ghost-backup-${STAMP}.tar.gz"
+          # MYSQL_PWD is injected into the db container's env for this one command
+          # so the password is never written to the container's process args.
+          # shellcheck disable=SC2029  # remote command intentionally expands on the runner
+          ssh "${SSH_USER}@${SSH_HOST}" "set -e; cd '${DEPLOY_DIR}'; \
+            docker compose exec -T -e MYSQL_PWD='${DB_ROOT_PW}' db \
+              mysqldump -u root --all-databases --single-transaction --no-tablespaces \
+              | gzip > /tmp/ghost-db.sql.gz; \
+            tar -czf /tmp/ghost-content.tar.gz -C '${DEPLOY_DIR}/data/ghost' .; \
+            tar -czf '/tmp/${BUNDLE}' -C /tmp ghost-db.sql.gz ghost-content.tar.gz; \
+            rm -f /tmp/ghost-db.sql.gz /tmp/ghost-content.tar.gz"
+          scp "${SSH_USER}@${SSH_HOST}:/tmp/${BUNDLE}" "./${BUNDLE}"
+          # shellcheck disable=SC2029  # remote command intentionally expands on the runner
+          ssh "${SSH_USER}@${SSH_HOST}" "rm -f '/tmp/${BUNDLE}'"
+          echo "BUNDLE=${BUNDLE}" >> "$GITHUB_ENV"
+
+      - name: Upload backup to Cloudflare R2
+        uses: NX1X/Cloudflare-R2-backup-action@170cc1daf854595c704a781f4d1dbe506a2b9f15 # v1.0.0
+        with:
+          operation: upload
+          account-id: ${{ secrets.CF_ACCOUNT_ID }}
+          access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
+          secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          bucket: ${{ vars.R2_BUCKET }}
+          prefix: ghost-backups/
+          file: ${{ env.BUNDLE }}
+
+      - name: Prune backups older than 30 days
+        uses: NX1X/Cloudflare-R2-backup-action@170cc1daf854595c704a781f4d1dbe506a2b9f15 # v1.0.0
+        with:
+          operation: prune
+          account-id: ${{ secrets.CF_ACCOUNT_ID }}
+          access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
+          secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          bucket: ${{ vars.R2_BUCKET }}
+          prefix: ghost-backups/
+          retention-days: "30"

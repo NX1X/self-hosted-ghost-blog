@@ -1,0 +1,283 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/main/schema/compose-spec.json
+
+# Shared hardening applied to every service via YAML merge (<<: *hardening):
+#   - no-new-privileges: a compromised process can never gain more privileges
+#     than the container started with (blocks setuid escalation).
+#   - pids_limit: caps process count per container (fork-bomb / runaway guard).
+#   - logging: bounded json-file so container logs can't fill the host disk.
+#     For internet-facing services, also ship logs to a remote sink.
+#
+# Further hardening you can enable after testing on your own stack (left opt-in
+# because it depends on each image's runtime needs):
+#   cap_drop: ["ALL"]        # then cap_add only what the image needs
+#   read_only: true          # with tmpfs/volumes for writable paths
+#   user: "<uid>:<gid>"      # run as an explicit non-root user
+x-hardening: &hardening
+  security_opt:
+    - "no-new-privileges:true"
+  pids_limit: 1024
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  nginx:
+    <<: *hardening
+    image: nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236  # https://hub.docker.com/_/nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    # Drop all Linux capabilities, then add back only what the nginx master
+    # process needs (drop privileges to the nginx user, bind ports < 1024).
+    # If nginx fails to start on your host, comment this block out and report it.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+      - DAC_OVERRIDE
+    depends_on:
+      - ghost
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider --timeout=2 http://127.0.0.1:80/ 2>&1 | grep -q '200\\|301\\|302\\|403' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - edge
+
+  ghost:
+    <<: *hardening
+    # Keep this in sync with the tinybird-sync container image below
+    image: ghost:6-alpine@sha256:63b12cb176ffe9cfe651b839c18f6c7261004370f566d9ae218cacd67766b2b1  # https://hub.docker.com/_/ghost
+    restart: always
+    expose:
+      - "2368"
+    # This is required to import current config when migrating
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      url: https://${DOMAIN:?DOMAIN environment variable is required}/
+      # Proxy configuration for load balancer setup
+      server__host: 0.0.0.0
+      server__port: 2368
+      # Trust proxy headers from load balancer / CDN
+      proxy: "true"
+      # Disable SSL enforcement since SSL is terminated at load balancer
+      server__forceAdminSSL: "false"
+      # Trust proxy for IP forwarding
+      server__trustProxy: "true"
+      database__client: mysql
+      database__connection__host: db
+      database__connection__user: ${DATABASE_USER:-ghost}
+      database__connection__password: ${DATABASE_PASSWORD:?DATABASE_PASSWORD environment variable is required}
+      database__connection__database: ghost
+      tinybird__tracker__endpoint: https://${DOMAIN:?DOMAIN environment variable is required}/.ghost/analytics/api/v1/page_hit
+      tinybird__adminToken: ${TINYBIRD_ADMIN_TOKEN:-}
+      tinybird__workspaceId: ${TINYBIRD_WORKSPACE_ID:-}
+      tinybird__tracker__datasource: analytics_events
+      tinybird__stats__endpoint: ${TINYBIRD_API_URL:-https://api.tinybird.co}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --server-response --spider --quiet http://127.0.0.1:2368/ 2>&1 | grep -E 'HTTP.*200|HTTP.*301|HTTP.*302' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    volumes:
+      - ${UPLOAD_LOCATION:-./data/ghost}:/var/lib/ghost/content
+    depends_on:
+      db:
+        condition: service_healthy
+    # edge: reached by nginx. internal: reaches the database.
+    networks:
+      - edge
+      - internal
+
+  db:
+    <<: *hardening
+    image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b  # https://hub.docker.com/_/mysql
+    restart: always
+    expose:
+      - "3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD:?DATABASE_ROOT_PASSWORD environment variable is required}
+      MYSQL_ROOT_HOST: localhost
+      MYSQL_USER: ${DATABASE_USER:-ghost}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD environment variable is required}
+      MYSQL_DATABASE: ghost
+      MYSQL_MULTIPLE_DATABASES: activitypub
+    volumes:
+      - ${MYSQL_DATA_LOCATION:-./data/mysql}:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    # Pass the password via MYSQL_PWD (env) instead of -p on the command line so
+    # it is not visible in the container's process list (docker top / ps).
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -u root --silent"]
+      interval: 10s
+      start_period: 30s
+      start_interval: 5s
+      retries: 12
+    # internal only: the database is never reachable from the edge network.
+    networks:
+      - internal
+
+  traffic-analytics:
+    <<: *hardening
+    # Pinned to a version tag + immutable digest. Renovate bumps both together.
+    image: ghost/traffic-analytics:1.0.226@sha256:4678eaab689b96e03883dcd09895062413e31a07ced611cd10926b57ef81d8fa  # https://hub.docker.com/r/ghost/traffic-analytics
+    restart: always
+    expose:
+      - "3000"
+    volumes:
+      - traffic_analytics_data:/data
+    environment:
+      NODE_ENV: production
+      PROXY_TARGET: ${TINYBIRD_API_URL:-https://api.tinybird.co}/v0/events
+      SALT_STORE_TYPE: ${SALT_STORE_TYPE:-file}
+      SALT_STORE_FILE_PATH: /data/salts.json
+      TINYBIRD_TRACKER_TOKEN: ${TINYBIRD_TRACKER_TOKEN:-}
+      LOG_LEVEL: debug
+    healthcheck:
+      test: ["CMD-SHELL", "wget --server-response --spider --quiet --timeout=2 http://127.0.0.1:3000/ 2>&1 | grep -E 'HTTP.*200|HTTP.*404' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    profiles: [analytics]
+    networks:
+      - edge
+
+  activitypub:
+    <<: *hardening
+    # Rolling image (no semver tags published; only sha-<commit> tags exist, so
+    # there is NO :latest). Pinned to a specific tag + immutable digest; Renovate
+    # bumps both together so updates stay controlled and reviewable.
+    image: ghcr.io/tryghost/activitypub:sha-51a7d53@sha256:508466b5aca426f48b133d183763f7c864ac8770848a5e98a914278e06681e16
+    restart: always
+    expose:
+      - "8080"
+    volumes:
+      - ${UPLOAD_LOCATION:-./data/ghost}:/opt/activitypub/content
+    environment:
+      # See https://github.com/TryGhost/ActivityPub/blob/main/docs/env-vars.md
+      NODE_ENV: production
+      MYSQL_HOST: db
+      MYSQL_USER: ${DATABASE_USER:-ghost}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD environment variable is required}
+      MYSQL_DATABASE: activitypub
+      LOCAL_STORAGE_PATH: /opt/activitypub/content/images/activitypub
+      LOCAL_STORAGE_HOSTING_URL: https://${DOMAIN}/content/images/activitypub
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8080 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+      activitypub-migrate:
+        condition: service_completed_successfully
+    profiles: [activitypub]
+    networks:
+      - edge
+      - internal
+
+  # Suporting Services
+
+  tinybird-login:
+    <<: *hardening
+    build:
+      context: ./tinybird
+      dockerfile: Dockerfile
+    working_dir: /home/tinybird
+    command: /usr/local/bin/tinybird-login
+    volumes:
+      - tinybird_home:/home/tinybird
+      - tinybird_files:/data/tinybird
+    profiles: [analytics]
+    networks:
+      - internal
+    tty: false
+    restart: no
+
+  tinybird-sync:
+    <<: *hardening
+    # Do not alter this without updating the Ghost container as well
+    image: ghost:6-alpine@sha256:63b12cb176ffe9cfe651b839c18f6c7261004370f566d9ae218cacd67766b2b1
+    command: >
+      sh -c "
+        if [ -d /var/lib/ghost/current/core/server/data/tinybird ]; then
+          rm -rf /data/tinybird/*;
+          cp -rf /var/lib/ghost/current/core/server/data/tinybird/* /data/tinybird/;
+          echo 'Tinybird files synced into shared volume.';
+        else
+          echo 'Tinybird source directory not found.';
+        fi
+      "
+    volumes:
+      - tinybird_files:/data/tinybird
+    depends_on:
+      tinybird-login:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    profiles: [analytics]
+    restart: no
+
+  tinybird-deploy:
+    <<: *hardening
+    build:
+      context: ./tinybird
+      dockerfile: Dockerfile
+    working_dir: /data/tinybird
+    command: >
+      sh -c "
+        tb-wrapper --cloud deploy
+      "
+    volumes:
+      - tinybird_home:/home/tinybird
+      - tinybird_files:/data/tinybird
+    depends_on:
+      tinybird-sync:
+        condition: service_completed_successfully
+    profiles: [analytics]
+    networks:
+      - internal
+    tty: true
+
+  activitypub-migrate:
+    <<: *hardening
+    # Rolling image (no semver tags). Pinned to a sha-<commit> tag + digest.
+    image: ghcr.io/tryghost/activitypub-migrations:sha-3093945@sha256:f7d94612017226cf6eabafd5b11bdaf95ba2024ec7b033fbb213193bdc0ddd33
+    environment:
+      MYSQL_DB: mysql://${DATABASE_USER:-ghost}:${DATABASE_PASSWORD:?DATABASE_PASSWORD environment variable is required}@tcp(db:3306)/activitypub
+    networks:
+      - internal
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: [activitypub]
+    restart: no
+
+volumes:
+  tinybird_files:
+  tinybird_home:
+  traffic_analytics_data:
+
+# Two-tier network: only nginx and the services it proxies sit on `edge`;
+# the database sits on `internal` and is unreachable from the edge tier.
+networks:
+  edge:
+  internal:

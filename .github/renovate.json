@@ -1,0 +1,80 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    "helpers:pinGitHubActionDigests",
+    "docker:pinDigests"
+  ],
+  "timezone": "UTC",
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "14 days",
+  "internalChecksFilter": "strict",
+  "configMigration": true,
+  "labels": ["dependencies"],
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 10,
+  "rangeStrategy": "bump",
+  "platformAutomerge": true,
+  "dependencyDashboardTitle": "Renovate Dependency Dashboard",
+  "dependencyDashboardOSVVulnerabilitySummary": "all",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "minimumReleaseAge": null,
+    "labels": ["security"],
+    "addLabels": ["security"],
+    "automerge": false
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "schedule": ["before 6am on the first day of the month"]
+  },
+  "packageRules": [
+    {
+      "description": "Automerge only the safest updates - digest re-pins and patches - after the 14-day window and once CI is green",
+      "matchUpdateTypes": ["digest", "pin", "pinDigest", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "Minor and major updates always get a human review",
+      "matchUpdateTypes": ["minor", "major"],
+      "automerge": false
+    },
+    {
+      "description": "Label majors for visibility",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major"]
+    },
+    {
+      "description": "Group non-major Docker image updates into a single PR",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "docker images (non-major)"
+    },
+    {
+      "description": "Core images (nginx/mysql/ghost/traffic-analytics): never automerge, ungroup, raise priority for fast visibility",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["nginx", "mysql", "ghost", "ghost/traffic-analytics"],
+      "groupName": null,
+      "prPriority": 10,
+      "automerge": false
+    },
+    {
+      "description": "Group GitHub Actions updates (digest + patch automerge via the rule above; minor/major stay manual)",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "addLabels": ["ci"]
+    },
+    {
+      "description": "Rolling activitypub images publish only sha tags - track by digest",
+      "matchPackageNames": [
+        "ghcr.io/tryghost/activitypub",
+        "ghcr.io/tryghost/activitypub-migrations"
+      ],
+      "groupName": "activitypub images"
+    }
+  ]
+}

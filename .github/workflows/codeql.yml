@@ -1,0 +1,54 @@
+name: CodeQL
+
+# Deep semantic SAST. Two analysis targets with reach in this repo:
+#   - javascript-typescript: scripts/config-to-env.js (the migration converter)
+#   - actions: the GitHub Actions workflows (taint/injection, complements zizmor)
+# Uses the security-extended query suite for broader coverage.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 4 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["javascript-typescript", "actions"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@08d09a53f0f5d694f253bd25732e4429c9e9337f # v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@08d09a53f0f5d694f253bd25732e4429c9e9337f # v3
+        with:
+          category: "/language:${{ matrix.language }}"

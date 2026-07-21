@@ -1,0 +1,71 @@
+name: Deploy
+
+# Zero-trust deploy over a Cloudflare Tunnel - the server never exposes an
+# inbound SSH port (22). NX1X/cloudflare-tunnel-ssh-action opens SSH through the
+# tunnel, then the stack is synced and restarted with docker compose.
+#
+# Required repository secrets:
+#   CF_ACCESS_CLIENT_ID       Cloudflare Access service token client id
+#   CF_ACCESS_CLIENT_SECRET   Cloudflare Access service token client secret
+#   DEPLOY_SSH_KEY            private key whose public half is authorized on the server
+#   DEPLOY_SSH_HOST          hostname routed through the tunnel (e.g. ssh.example.com)
+# Optional repository variables:
+#   DEPLOY_SSH_USER (default: deploy)   DEPLOY_DIR (default: /opt/ghost-blog)
+#
+# See docs/DEPLOYMENT.md for the full setup, including a WARP-based alternative.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up SSH over Cloudflare Tunnel
+        uses: NX1X/cloudflare-tunnel-ssh-action@5b09bfc4ba3dc20b3d77d96271fff5a20fe64107 # v1.0.0
+        with:
+          cf-access-client-id: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          cf-access-client-secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          ssh-host: ${{ secrets.DEPLOY_SSH_HOST }}
+          ssh-user: ${{ vars.DEPLOY_SSH_USER || 'deploy' }}
+
+      - name: Sync stack to server
+        env:
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ vars.DEPLOY_SSH_USER || 'deploy' }}
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/opt/ghost-blog' }}
+        run: |
+          # Send only what the server needs to run the stack. .env, ssl/ and
+          # data/ live on the server and are protected from --delete so CI can
+          # never overwrite secrets, TLS material, or the live database/uploads.
+          rsync -az --delete \
+            --exclude='.env' --exclude='ssl' --exclude='data' \
+            compose.yml env.example nginx mysql-init tinybird \
+            "${SSH_USER}@${SSH_HOST}:${DEPLOY_DIR}/"
+
+      - name: Pull images and restart
+        env:
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ vars.DEPLOY_SSH_USER || 'deploy' }}
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/opt/ghost-blog' }}
+        run: |
+          # shellcheck disable=SC2029  # remote command intentionally expands on the runner
+          ssh "${SSH_USER}@${SSH_HOST}" \
+            "cd '${DEPLOY_DIR}' && docker compose pull && docker compose up -d --remove-orphans && docker image prune -f"

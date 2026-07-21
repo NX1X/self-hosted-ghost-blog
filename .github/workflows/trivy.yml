@@ -1,0 +1,82 @@
+name: Trivy
+
+# Scans for:
+#   - Misconfigurations in compose.yml, the Tinybird Dockerfile, and other IaC
+#   - Vulnerable OS/library packages referenced in the repo (fs scan)
+#   - Leaked secrets (defence in depth alongside Gitleaks)
+# Results are uploaded to the GitHub Security tab as SARIF.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trivy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Trivy config / IaC scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config.sarif
+          severity: CRITICAL,HIGH,MEDIUM
+          exit-code: "0"
+
+      - name: Trivy filesystem + secret scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy-fs.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "0"
+
+      # Hard gate: fail the build on CRITICAL misconfigurations. The SARIF scans
+      # above stay informational (exit-code 0) so HIGH/MEDIUM still surface in
+      # the Security tab without blocking every PR.
+      - name: Trivy config gate (fail on CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+
+      - name: Upload config SARIF
+        uses: github/codeql-action/upload-sarif@08d09a53f0f5d694f253bd25732e4429c9e9337f # v3
+        if: always()
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+      - name: Upload filesystem SARIF
+        uses: github/codeql-action/upload-sarif@08d09a53f0f5d694f253bd25732e4429c9e9337f # v3
+        if: always()
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs

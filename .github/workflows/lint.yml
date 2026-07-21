@@ -1,0 +1,79 @@
+name: Lint
+
+# Static checks for the shell scripts, Dockerfile, compose file and workflows.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
+        env:
+          SHELLCHECK_OPTS: -e SC1091
+        with:
+          # tinybird/tb-wrapper and getTokens.sh have no .sh extension.
+          additional_files: "tb-wrapper getTokens.sh handleLogin.sh"
+          severity: warning
+
+  hadolint:
+    name: Hadolint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Hadolint
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+        with:
+          dockerfile: tinybird/Dockerfile
+          failure-threshold: warning
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: actionlint
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2
+
+  compose-validate:
+    name: Compose config
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate compose.yml
+        run: |
+          # The ghost service uses `env_file: .env`, which must exist for
+          # `docker compose config` to parse. Use the template for validation.
+          cp env.example .env
+          # Provide the required vars so interpolation/validation succeeds.
+          export DOMAIN=example.com
+          export DATABASE_PASSWORD=ci-placeholder
+          export DATABASE_ROOT_PASSWORD=ci-placeholder
+          docker compose --profile analytics --profile activitypub config --quiet
+          echo "compose.yml is valid."

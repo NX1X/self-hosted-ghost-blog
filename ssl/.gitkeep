@@ -1,0 +1,3 @@
+# This directory is for SSL certificates
+# SSL certificates are deployed via SSH, never committed to git
+# See deployment instructions in DEPLOYMENT.md

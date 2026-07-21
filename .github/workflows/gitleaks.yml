@@ -1,0 +1,40 @@
+name: Gitleaks
+
+# Scans the working tree and (on push) full git history for committed secrets.
+# Critical for a repo that is being opened to the public.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Full history so the scan covers every past commit, not just HEAD.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Note: gitleaks-action requires a GITLEAKS_LICENSE secret only for
+          # GitHub *organization* accounts. Personal/public repos need nothing.
+          # Add `GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}` here if this
+          # repo is moved under an organization.

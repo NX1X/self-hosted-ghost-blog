@@ -1,0 +1,18 @@
+self-hosted-ghost-blog
+Copyright 2025-2026 NX1X
+
+This product is licensed under the Apache License, Version 2.0 (the "License").
+You may obtain a copy of the License in the LICENSE file or at
+http://www.apache.org/licenses/LICENSE-2.0
+
+---
+
+This project is an independent Docker Compose architecture for self-hosting
+Ghost CMS. It is NOT affiliated with, endorsed by, or sponsored by the Ghost
+Foundation or the official Ghost project.
+
+"Ghost" is a trademark of the Ghost Foundation. Ghost CMS itself is distributed
+under the MIT License by the Ghost Foundation. This repository does not
+redistribute Ghost source code; it orchestrates the official upstream container
+images. MySQL and nginx are trademarks of their respective owners and are used
+here only to identify the upstream software being orchestrated.

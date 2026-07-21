@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+pids
+*.pid
+
+# Environment - never commit real secrets (env.example is the only tracked one)
+.env
+.env.*
+
+# Docker bind-mount data (Ghost uploads, MySQL data)
+data/
+
+# Tinybird local auth token
+.tinyb
+
+# TLS material - provisioned on the server, never committed
+ssl/*.pem
+ssl/*.crt
+ssl/*.key
+ssl/*.p12
+
+# SSH keys - never commit private keys
+*.pem
+*_rsa
+*_ed25519
+id_rsa*
+id_ed25519*
+
+# Backups, database dumps, and CI backup bundles (contain live data - NEVER commit)
+*.bak
+*.old
+backups/
+*.tar.gz
+*.tgz
+*.sql
+*.sql.gz
+*.dump
+ghost-backup-*
+
+# Security scanner outputs from local runs
+*.sarif
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.iml
+
+# Maintainer-only repo-protection tooling (GitHub ruleset config + apply script).
+# Kept local so `apply.sh` still works; never published (it documents live posture).
+scripts/repo-protection/
+docs/REPO-HARDENING.md
