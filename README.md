@@ -5,6 +5,7 @@ Production-ready Ghost CMS deployment with Docker Compose, featuring nginx rever
 [![Release](https://img.shields.io/github/v/release/NX1X/self-hosted-ghost-blog?sort=semver&color=blue)](https://github.com/NX1X/self-hosted-ghost-blog/releases)
 [![Last commit](https://img.shields.io/github/last-commit/NX1X/self-hosted-ghost-blog)](https://github.com/NX1X/self-hosted-ghost-blog/commits/main)
 [![Issues](https://img.shields.io/github/issues/NX1X/self-hosted-ghost-blog)](https://github.com/NX1X/self-hosted-ghost-blog/issues)
+[![Views](https://visitor-badge.laobi.icu/badge?page_id=NX1X.self-hosted-ghost-blog)](https://github.com/NX1X/self-hosted-ghost-blog)
 
 [![CodeQL](https://github.com/NX1X/self-hosted-ghost-blog/actions/workflows/codeql.yml/badge.svg)](https://github.com/NX1X/self-hosted-ghost-blog/actions/workflows/codeql.yml)
 [![Trivy](https://github.com/NX1X/self-hosted-ghost-blog/actions/workflows/trivy.yml/badge.svg)](https://github.com/NX1X/self-hosted-ghost-blog/actions/workflows/trivy.yml)

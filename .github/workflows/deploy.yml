@@ -15,8 +15,11 @@ name: Deploy
 # See docs/DEPLOYMENT.md for the full setup, including a WARP-based alternative.
 
 on:
-  push:
-    branches: [main]
+  # Manual-only by default: this repo ships without deploy secrets or a server,
+  # so it never runs on its own. Once you've configured the Cloudflare Tunnel
+  # secrets (see docs/DEPLOYMENT.md), uncomment the push trigger for real CD.
+  # push:
+  #   branches: [main]
   workflow_dispatch:
 
 permissions:

@@ -15,8 +15,11 @@ name: Backup
 #   R2_BUCKET                                        target R2 bucket name
 
 on:
-  schedule:
-    - cron: "0 3 * * *" # daily at 03:00 UTC
+  # Manual-only by default: this repo ships without R2/tunnel secrets, so it
+  # never runs on its own. Once the secrets are configured (see
+  # docs/DEPLOYMENT.md), uncomment the schedule for nightly off-site backups.
+  # schedule:
+  #   - cron: "0 3 * * *" # daily at 03:00 UTC
   workflow_dispatch:
 
 permissions:
