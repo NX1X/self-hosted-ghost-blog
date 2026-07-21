@@ -21,7 +21,7 @@ Initial public release.
 - CI/CD deploy over a Cloudflare Tunnel (no inbound SSH) and a nightly Cloudflare
   R2 off-site backup workflow with retention-based pruning.
 - Security automation: Renovate, Gitleaks, Trivy, CodeQL, zizmor,
-  dependency-review, OpenSSF Scorecard, and ShellCheck/Hadolint/actionlint.
+  dependency-review, and ShellCheck/Hadolint/actionlint.
 - Deployment guide under `docs/` (including a WARP option).
 
 ### Security

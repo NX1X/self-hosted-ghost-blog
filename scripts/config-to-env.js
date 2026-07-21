@@ -76,8 +76,9 @@ function flattenObject(obj, prefix = '') {
 function formatValue(value) {
   // If value contains spaces, newlines, or quotes, wrap in quotes
   if (typeof value === 'string' && (value.includes(' ') || value.includes('\n') || value.includes('"') || value.includes("'"))) {
-    // Escape any existing double quotes
-    value = value.replaceAll(/"/g, '\\"');
+    // Escape backslashes first, then double quotes - order matters so the
+    // escaping can't be bypassed by a backslash immediately before a quote.
+    value = value.replaceAll(/\\/g, '\\\\').replaceAll(/"/g, '\\"');
     return `"${value}"`;
   }
   return value;

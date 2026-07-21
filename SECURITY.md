@@ -36,8 +36,7 @@ how this project configures or exposes those services are in scope here.
   Renovate and Dependabot.
 - CI scans the repository on every push and pull request: Gitleaks (secret
   scanning), Trivy (image and filesystem CVEs and misconfigurations), CodeQL
-  (SAST), zizmor (GitHub Actions auditing), dependency-review, and OpenSSF
-  Scorecard.
+  (SAST), zizmor (GitHub Actions auditing), and dependency-review.
 - No secrets or credentials are committed to the repository. All configuration
   is supplied at runtime via a local, gitignored `.env` file.
 - All Docker images and GitHub Actions are pinned to immutable digests.
