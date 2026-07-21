@@ -106,7 +106,7 @@ services:
 
   db:
     <<: *hardening
-    image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b  # https://hub.docker.com/_/mysql
+    image: mysql:9.6@sha256:c5df04bee1a42b74a5841c6409e669cf62126cd0416f00c1cea8ab933b9361b9  # https://hub.docker.com/_/mysql
     restart: always
     expose:
       - "3306"
