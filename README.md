@@ -13,7 +13,6 @@ Production-ready Ghost CMS deployment with Docker Compose, featuring nginx rever
 [![zizmor](https://github.com/NX1X/self-hosted-ghost-blog/actions/workflows/zizmor.yml/badge.svg)](https://github.com/NX1X/self-hosted-ghost-blog/actions/workflows/zizmor.yml)
 [![Lint](https://github.com/NX1X/self-hosted-ghost-blog/actions/workflows/lint.yml/badge.svg)](https://github.com/NX1X/self-hosted-ghost-blog/actions/workflows/lint.yml)
 [![Dependency Review](https://github.com/NX1X/self-hosted-ghost-blog/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/NX1X/self-hosted-ghost-blog/actions/workflows/dependency-review.yml)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/NX1X/self-hosted-ghost-blog/badge)](https://securityscorecards.dev/viewer/?uri=github.com/NX1X/self-hosted-ghost-blog)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 ## A Word from the Developer
@@ -165,7 +164,6 @@ scanned. They run on push, on pull requests, and on a weekly schedule.
 | `codeql.yml` | [CodeQL](https://codeql.github.com/) | Semantic SAST (security-extended) on the JS migration script and the Actions workflows. |
 | `zizmor.yml` | [zizmor](https://github.com/woodruffw/zizmor) | Audits the workflows themselves for script injection, over-broad permissions and credential persistence. |
 | `dependency-review.yml` | [dependency-review](https://github.com/actions/dependency-review-action) | Blocks PRs that add vulnerable or disallowed-license dependencies. |
-| `scorecard.yml` | [OpenSSF Scorecard](https://github.com/ossf/scorecard) | Scores the repo's supply-chain security posture. |
 
 ### Renovate setup
 

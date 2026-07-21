@@ -37,3 +37,6 @@ RUN curl -fsSL https://tinybird.co -o /tmp/tb-install.sh \
     && rm -f /tmp/tb-install.sh
 
 ENV PATH="/home/tinybird/.local/bin:$PATH"
+
+# Sanity check that the Tinybird CLI is installed and on PATH.
+HEALTHCHECK CMD tb --version || exit 1
