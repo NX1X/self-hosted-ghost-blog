@@ -34,47 +34,17 @@
   },
   "packageRules": [
     {
-      "description": "Automerge only the safest updates - digest re-pins and patches - after the 14-day window and once CI is green",
-      "matchUpdateTypes": ["digest", "pin", "pinDigest", "patch"],
+      "description": "Batch every non-major update (Docker digest/patch/minor + GitHub Actions) into ONE weekly PR and automerge it once the 14-day cooldown has passed and CI is green. This is a template repo, so no running service is affected.",
+      "matchUpdateTypes": ["digest", "pin", "pinDigest", "patch", "minor"],
+      "groupName": "non-major dependencies",
       "automerge": true
     },
     {
-      "description": "Minor and major updates always get a human review",
-      "matchUpdateTypes": ["minor", "major"],
-      "automerge": false
-    },
-    {
-      "description": "Label majors for visibility",
+      "description": "Major updates: keep as separate PRs, label them, and require a human to review and merge (potential breaking changes).",
       "matchUpdateTypes": ["major"],
-      "addLabels": ["major"]
-    },
-    {
-      "description": "Group non-major Docker image updates into a single PR",
-      "matchDatasources": ["docker"],
-      "matchUpdateTypes": ["minor", "patch", "digest"],
-      "groupName": "docker images (non-major)"
-    },
-    {
-      "description": "Core images (nginx/mysql/ghost/traffic-analytics): never automerge, ungroup, raise priority for fast visibility",
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["nginx", "mysql", "ghost", "ghost/traffic-analytics"],
       "groupName": null,
-      "prPriority": 10,
-      "automerge": false
-    },
-    {
-      "description": "Group GitHub Actions updates (digest + patch automerge via the rule above; minor/major stay manual)",
-      "matchManagers": ["github-actions"],
-      "groupName": "github actions",
-      "addLabels": ["ci"]
-    },
-    {
-      "description": "Rolling activitypub images publish only sha tags - track by digest",
-      "matchPackageNames": [
-        "ghcr.io/tryghost/activitypub",
-        "ghcr.io/tryghost/activitypub-migrations"
-      ],
-      "groupName": "activitypub images"
+      "automerge": false,
+      "addLabels": ["major"]
     }
   ]
 }
