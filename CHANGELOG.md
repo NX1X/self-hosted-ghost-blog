@@ -5,6 +5,40 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Repository views badge in the README.
+- zizmor configuration (`.github/zizmor.yml`) that ignores `ref-version-mismatch`
+  for Renovate-managed digest pins (the SHA is correct; only the version comment
+  drifts as major tags advance).
+
+### Changed
+
+- Deploy and backup workflows are manual-only (`workflow_dispatch`); their
+  push/schedule triggers are commented out until deploy secrets are configured.
+- Renovate batches all non-major updates (Docker + GitHub Actions) into a single
+  weekly PR that auto-merges after the 14-day cooldown once CI is green; major
+  and security updates stay separate and manual.
+- zizmor now runs on every pull request (removed its workflow-path filter) so the
+  required check can no longer deadlock PRs that don't touch workflows.
+- Dependency bumps: nginx 1.28 -> 1.29, ghost/traffic-analytics 1.0.226 -> 1.0.273,
+  and major GitHub Actions updates (checkout v7, setup-python v6, codeql-action v4,
+  gitleaks-action v3).
+
+### Removed
+
+- OpenSSF Scorecard workflow and badge - it scored a solo, ruleset-protected repo
+  inaccurately (it can't detect ruleset-based branch protection) and generated
+  noisy Security-tab alerts.
+
+### Fixed
+
+- `scripts/config-to-env.js`: complete shell escaping (backslashes escaped before
+  quotes), resolving CodeQL `js/incomplete-sanitization`.
+- `tinybird/Dockerfile`: added a `HEALTHCHECK` (Trivy `DS-0026`).
+
 ## [0.1.1] - 2026-07-21
 
 Initial public release.
