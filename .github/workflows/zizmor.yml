@@ -8,8 +8,10 @@ on:
   push:
     branches: ["main"]
     paths: [".github/workflows/**"]
+  # No path filter on PRs: `zizmor` is a required status check, so it must run on
+  # every pull request (a path-filtered required check blocks any PR that doesn't
+  # touch the filtered paths). It re-audits the workflows quickly either way.
   pull_request:
-    paths: [".github/workflows/**"]
   schedule:
     - cron: "0 6 * * 6"
   workflow_dispatch:
