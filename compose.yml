@@ -59,7 +59,7 @@ services:
   ghost:
     <<: *hardening
     # Keep this in sync with the tinybird-sync container image below
-    image: ghost:6-alpine@sha256:63b12cb176ffe9cfe651b839c18f6c7261004370f566d9ae218cacd67766b2b1  # https://hub.docker.com/_/ghost
+    image: ghost:6-alpine@sha256:29886ddcf4ae5c005099c8ade34707d7c8d5d71b9dc5e31473c632b27b2ea18a  # https://hub.docker.com/_/ghost
     restart: always
     expose:
       - "2368"
@@ -106,7 +106,7 @@ services:
 
   db:
     <<: *hardening
-    image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b  # https://hub.docker.com/_/mysql
+    image: mysql:8.3@sha256:9de9d54fecee6253130e65154b930978b1fcc336bcc86dfd06e89b72a2588ebe  # https://hub.docker.com/_/mysql
     restart: always
     expose:
       - "3306"
@@ -135,7 +135,7 @@ services:
   traffic-analytics:
     <<: *hardening
     # Pinned to a version tag + immutable digest. Renovate bumps both together.
-    image: ghost/traffic-analytics:1.0.273@sha256:60fa7a3fd377d46d75390b8253885d9baa26604b9c10e9bb8069e8b20eb9394e  # https://hub.docker.com/r/ghost/traffic-analytics
+    image: ghost/traffic-analytics:1.0.284@sha256:9746c9d7a72abdf996dbdc3c0d6d78952dc058f8a655ba1ef984a0f3c9a179cb  # https://hub.docker.com/r/ghost/traffic-analytics
     restart: always
     expose:
       - "3000"
@@ -215,7 +215,7 @@ services:
   tinybird-sync:
     <<: *hardening
     # Do not alter this without updating the Ghost container as well
-    image: ghost:6-alpine@sha256:63b12cb176ffe9cfe651b839c18f6c7261004370f566d9ae218cacd67766b2b1
+    image: ghost:6-alpine@sha256:29886ddcf4ae5c005099c8ade34707d7c8d5d71b9dc5e31473c632b27b2ea18a
     command: >
       sh -c "
         if [ -d /var/lib/ghost/current/core/server/data/tinybird ]; then
