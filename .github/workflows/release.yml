@@ -1,0 +1,177 @@
+name: Release
+
+# Cuts a GitHub Release from a pushed v* tag, using the matching CHANGELOG
+# section as the release notes, then points versioned GHCR tags at the already
+# published Tinybird image.
+#
+# v0.1.1 and v0.1.2 were cut by hand. This automates that, and adds the gate the
+# manual process lacked: the release fails if CHANGELOG.md has no section for
+# the tag, so a tag can never ship with empty or stale notes.
+#
+# Usage:
+#   1. Merge a PR that adds the `## [X.Y.Z] - YYYY-MM-DD` CHANGELOG section.
+#   2. git tag vX.Y.Z && git push origin vX.Y.Z
+#
+# The tag ruleset (scripts/repo-protection/tag-ruleset.json) blocks tag update
+# and deletion, so a pushed tag is final - hence the validation below runs
+# before anything is published.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release (e.g. v0.2.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # create the GitHub Release
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      prerelease: ${{ steps.ver.outputs.prerelease }}
+    steps:
+      - name: Resolve tag
+        id: tag
+        env:
+          # workflow_dispatch passes the tag explicitly; a tag push carries it
+          # in ref_name. Read both via env so neither can be a script-injection
+          # sink.
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          tag="${INPUT_TAG:-$REF_NAME}"
+          case "$tag" in
+            v*) ;;
+            *) echo "::error::Expected a v-prefixed tag, got '${tag}'."; exit 1 ;;
+          esac
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          persist-credentials: false
+
+      - name: Derive version
+        id: ver
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          version="${TAG#v}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          # A pre-release carries a hyphenated suffix, e.g. 0.3.0-rc1.
+          case "$version" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      # The gate the manual process never had: no CHANGELOG section, no release.
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          # Stop at the next version heading, and also at the link-reference
+          # block at the bottom of the file - otherwise the OLDEST section runs
+          # to EOF and swallows every `[x.y.z]: https://...` definition.
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { flag = 1; next }
+            flag && /^## \[/ { exit }
+            flag && /^\[[^]]+\]: / { exit }
+            flag { print }
+          ' CHANGELOG.md > release-notes.md
+
+          # Reject a missing or whitespace-only section.
+          if [ ! -s release-notes.md ] || ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "::error::CHANGELOG.md has no content under '## [${VERSION}]'. Add the section before tagging."
+            exit 1
+          fi
+
+          echo "Release notes for ${VERSION}:"
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          PRERELEASE: ${{ steps.ver.outputs.prerelease }}
+        run: |
+          prerelease_flag=""
+          if [ "$PRERELEASE" = "true" ]; then
+            prerelease_flag="--prerelease"
+          fi
+
+          # --verify-tag: refuse to invent a tag that isn't already pushed.
+          # shellcheck disable=SC2086  # prerelease_flag is intentionally unquoted (empty = no flag)
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file release-notes.md \
+            --verify-tag \
+            $prerelease_flag
+
+  tag-image:
+    name: Tag GHCR image with the release version
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # Runs after the release exists, so a registry hiccup can never block the
+      # release itself. No rebuild happens here: the existing `edge` manifest is
+      # re-pointed under version tags, so vX.Y.Z is byte-identical to the image
+      # that was already scanned and attested by publish-tinybird.yml.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@371161bbe7024a29a25c5e19bfcbc0804fe9ad2c # v4.5.2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Point version tags at the published digest
+        env:
+          REPO: ${{ github.repository }}
+          VERSION: ${{ needs.release.outputs.version }}
+          PRERELEASE: ${{ needs.release.outputs.prerelease }}
+        run: |
+          image="ghcr.io/${REPO,,}/tinybird"
+          digest="$(docker buildx imagetools inspect "${image}:edge" --format '{{.Manifest.Digest}}')"
+
+          # X.Y.Z is immutable. X.Y floats to the newest patch of that minor, so
+          # a pre-release must NOT move it - 0.3.0-rc1 would otherwise make 0.3
+          # point at an untested build for anyone tracking the floating tag.
+          tags=(--tag "${image}:${VERSION}")
+          if [ "$PRERELEASE" != "true" ]; then
+            tags+=(--tag "${image}:${VERSION%.*}")
+          fi
+
+          docker buildx imagetools create "${tags[@]}" "${image}@${digest}"
+
+          {
+            echo "### Tinybird image tagged"
+            echo
+            for t in "${tags[@]}"; do
+              [ "$t" = "--tag" ] && continue
+              echo "- \`${t}\`"
+            done
+            echo
+            echo "All point at \`${digest}\` - no rebuild."
+          } >> "$GITHUB_STEP_SUMMARY"
