@@ -47,6 +47,14 @@
       "addLabels": ["major"]
     },
     {
+      "description": "Keep MySQL on the LTS track. Oracle alternates LTS releases (8.4, supported for years) with Innovation releases (8.1-8.3, 9.x) that reach EOL as soon as the next one ships. Without this constraint Renovate happily upgrades to an Innovation release - it already moved this repo from 8.0 LTS to the EOL 8.3. Capping below 9 keeps it on 8.4; moving to the next LTS is a deliberate human step, since MySQL supports in-place upgrade but NOT downgrade.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["mysql"],
+      "allowedVersions": "<9",
+      "automerge": false,
+      "addLabels": ["database"]
+    },
+    {
       "description": "The Tinybird helper image is built from this repo by publish-tinybird.yml, scanned before push, and provenance-attested. Its digest is ours, not a third party's, so the 14-day supply-chain cooldown does not apply - pin the new digest as soon as it is published. Listed last so it overrides the batching rules above.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["ghcr.io/nx1x/self-hosted-ghost-blog/tinybird"],

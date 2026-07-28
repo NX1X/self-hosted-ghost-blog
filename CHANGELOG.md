@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- MySQL moved to **8.4 LTS**. The previous automated bump had landed on 8.3, an
+  Innovation release that is already end-of-life; 8.4 is the LTS line. Renovate
+  is now capped below 9 so it cannot drift onto an Innovation release again, and
+  MySQL updates no longer auto-merge. Note that MySQL supports in-place upgrade
+  but **not** downgrade - back up the data volume before deploying this.
+- README now documents the pinned version of every service in a table, replacing
+  the stack badges that had drifted (they still advertised MySQL 8.0 and nginx
+  1.28 while `compose.yml` ran 8.3 and 1.29).
 - `tinybird-login` and `tinybird-deploy` reference the published GHCR image
   instead of a local `build:` context. Previously `docker compose up` on the
   production server compiled the image there on every deploy - unscanned, not

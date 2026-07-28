@@ -28,8 +28,8 @@ to do it.
 ## Stack
 
 ![Ghost](https://img.shields.io/badge/Ghost-6.x-738A94?logo=ghost&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
-![nginx](https://img.shields.io/badge/nginx-1.28-009639?logo=nginx&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.4_LTS-4479A1?logo=mysql&logoColor=white)
+![nginx](https://img.shields.io/badge/nginx-1.29-009639?logo=nginx&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker_Compose-v2-2496ED?logo=docker&logoColor=white)
 
 ## Architecture
@@ -40,11 +40,17 @@ Internet → CDN / Tunnel → Nginx → Ghost CMS
                                 → Tinybird Analytics (optional)
 ```
 
-- **Ghost** : CMS application (port 2368 internal)
-- **MySQL** : Database backend with health checks
-- **Nginx** : Reverse proxy with rate limiting, bot protection, and security headers
-- **ActivityPub** : Federated social networking (optional profile)
-- **Tinybird** : Web analytics (optional profile)
+| Service | Pinned version | Role |
+|---------|----------------|------|
+| **Ghost** | `6-alpine` | CMS application (port 2368, internal only) |
+| **MySQL** | `8.4` (LTS) | Database backend with health checks |
+| **Nginx** | `1.29-alpine` | Reverse proxy: rate limiting, bot protection, security headers |
+| **traffic-analytics** | `1.0.284` | Analytics proxy (`analytics` profile) |
+| **ActivityPub** | rolling `sha-` tag | Federated social networking (`activitypub` profile) |
+| **Tinybird CLI helper** | `edge` from GHCR | Analytics setup (`analytics` profile) |
+
+[`compose.yml`](compose.yml) is the source of truth - every entry above is
+additionally pinned to an immutable `@sha256` digest there.
 
 ## Quick Start
 
@@ -220,6 +226,12 @@ Image update strategy:
 
 - `nginx`, `ghost`, `mysql`, `ghost/traffic-analytics` are pinned to version
   tags, so Renovate proposes tracked upgrades with changelogs.
+- `mysql` is held to the **LTS track** (`< 9`). Oracle ships Innovation releases
+  (8.1-8.3, 9.x) that reach EOL as soon as the next one lands, alongside LTS
+  releases (8.4) supported for years. Renovate will not move MySQL off LTS on
+  its own - jumping to the next LTS is a deliberate, human-reviewed step,
+  because **MySQL supports in-place upgrade but not downgrade**. Back up the
+  data volume first.
 - `tryghost/activitypub` / `activitypub-migrations` publish no semver tags, so
   Renovate pins and bumps their immutable `@sha256` digest instead.
 - Every image is already pinned to an immutable `@sha256` digest; Renovate keeps
