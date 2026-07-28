@@ -166,6 +166,24 @@ scanned. They run on push, on pull requests, and on a weekly schedule.
 | `zizmor.yml` | [zizmor](https://github.com/woodruffw/zizmor) | Audits the workflows themselves for script injection, over-broad permissions and credential persistence. |
 | `dependency-review.yml` | [dependency-review](https://github.com/actions/dependency-review-action) | Blocks PRs that add vulnerable or disallowed-license dependencies. |
 | `publish-tinybird.yml` | Buildx, Trivy, [attest-build-provenance](https://github.com/actions/attest-build-provenance) | Builds `tinybird/Dockerfile`, scans it, and publishes a multi-arch image with an SBOM and signed provenance to GHCR. |
+| `release.yml` | `gh`, Buildx | On a `v*` tag: publishes a GitHub Release using the matching `CHANGELOG.md` section, and points versioned GHCR tags at the already published image. |
+
+### Cutting a release
+
+1. Open a PR adding a `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`
+   (plus its compare link at the bottom of the file).
+2. After it merges, tag the merge commit:
+
+   ```bash
+   git tag vX.Y.Z && git push origin vX.Y.Z
+   ```
+
+`release.yml` takes it from there. It refuses to publish if `CHANGELOG.md` has
+no content for that version, so a tag can never ship with empty or stale notes -
+and since the tag ruleset blocks tag updates and deletion, that check runs
+before anything is published. It then points `X.Y.Z` and `X.Y` at the existing
+Tinybird image digest, so a versioned tag is byte-identical to the image that
+was already scanned and attested; nothing is rebuilt.
 
 ### The Tinybird helper image
 

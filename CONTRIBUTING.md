@@ -44,7 +44,9 @@ docker compose --profile=activitypub up -d
    docker compose config -q          # compose file is valid
    shellcheck scripts/*.sh           # shell scripts lint clean
    ```
-4. Update `CHANGELOG.md` under the next version header.
+4. Update `CHANGELOG.md` under the next version header. Releases are cut by
+   pushing a `vX.Y.Z` tag, and `release.yml` builds the release notes from that
+   section - if it is missing, the release fails.
 5. Open a pull request and fill out the template.
 
 ## Changelog

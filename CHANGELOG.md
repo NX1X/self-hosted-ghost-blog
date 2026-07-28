@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   locally instead of pulling it from GHCR.
 - `DEPLOY_PULL_PROFILES` repository variable (default `analytics activitypub`)
   controlling which compose profiles the deploy pulls images for.
+- `release.yml` workflow: on a `v*` tag it publishes a GitHub Release using the
+  matching `CHANGELOG.md` section, refusing to publish if that section is
+  missing or empty, and points `X.Y.Z` / `X.Y` GHCR tags at the already
+  published Tinybird image digest without rebuilding it. Previous releases were
+  cut by hand.
 
 ### Changed
 
