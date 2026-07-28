@@ -77,3 +77,7 @@ jobs:
           export DATABASE_ROOT_PASSWORD=ci-placeholder
           docker compose --profile analytics --profile activitypub config --quiet
           echo "compose.yml is valid."
+          # The local-build overlay must also compose cleanly on its own.
+          docker compose -f compose.yml -f compose.build.yml \
+            --profile analytics --profile activitypub config --quiet
+          echo "compose.yml + compose.build.yml is valid."

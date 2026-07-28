@@ -1,0 +1,27 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/main/schema/compose-spec.json
+
+# Local-build overlay for the Tinybird helper image.
+#
+# compose.yml pins the published GHCR image so the production server never
+# compiles anything. Use this overlay when you are changing tinybird/ and want
+# to run your own build, or if GHCR is unreachable:
+#
+#   docker compose -f compose.yml -f compose.build.yml build
+#   docker compose -f compose.yml -f compose.build.yml --profile analytics up
+#
+# The image reference is overridden to a local tag on purpose: a freshly built
+# image cannot be tagged with the @sha256 digest that compose.yml pins.
+
+services:
+  tinybird-login:
+    image: ghost-blog/tinybird:local
+    build:
+      context: ./tinybird
+      dockerfile: Dockerfile
+
+  tinybird-deploy:
+    image: ghost-blog/tinybird:local
+    build:
+      context: ./tinybird
+      dockerfile: Dockerfile

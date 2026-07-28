@@ -45,6 +45,16 @@
       "groupName": null,
       "automerge": false,
       "addLabels": ["major"]
+    },
+    {
+      "description": "The Tinybird helper image is built from this repo by publish-tinybird.yml, scanned before push, and provenance-attested. Its digest is ours, not a third party's, so the 14-day supply-chain cooldown does not apply - pin the new digest as soon as it is published. Listed last so it overrides the batching rules above.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/nx1x/self-hosted-ghost-blog/tinybird"],
+      "minimumReleaseAge": null,
+      "internalChecksFilter": "none",
+      "groupName": null,
+      "automerge": true,
+      "addLabels": ["self-published"]
     }
   ]
 }

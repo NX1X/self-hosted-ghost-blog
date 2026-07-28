@@ -5,6 +5,41 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-07-28
+
+### Added
+
+- `publish-tinybird.yml` workflow: builds `tinybird/Dockerfile` for
+  `linux/amd64` and `linux/arm64`, scans it with Trivy (CRITICAL blocks the
+  publish), and pushes it to
+  `ghcr.io/nx1x/self-hosted-ghost-blog/tinybird` with an SBOM and signed
+  in-toto build provenance. Pull requests build and scan but never push.
+- `compose.build.yml`: optional overlay that rebuilds the Tinybird helper image
+  locally instead of pulling it from GHCR.
+- `DEPLOY_PULL_PROFILES` repository variable (default `analytics activitypub`)
+  controlling which compose profiles the deploy pulls images for.
+
+### Changed
+
+- `tinybird-login` and `tinybird-deploy` reference the published GHCR image
+  instead of a local `build:` context. Previously `docker compose up` on the
+  production server compiled the image there on every deploy - unscanned, not
+  digest-pinnable, and requiring a build toolchain on the host.
+- Renovate treats the self-published `tinybird` image as exempt from the 14-day
+  supply-chain cooldown, since its digest comes from this repo's own scanned and
+  attested build.
+- `lint.yml` also validates `compose.yml` merged with `compose.build.yml`.
+- The deploy workflow syncs `compose.build.yml` to the server so the Tinybird
+  image can still be rebuilt on the box if GHCR is unreachable.
+
+### Fixed
+
+- The deploy workflow's bare `docker compose pull` only covered profile-less
+  services, so images behind the `analytics` and `activitypub` profiles were
+  never refreshed by CD. It now pulls those profiles explicitly while still
+  starting only the always-on services, keeping the one-shot jobs
+  operator-triggered.
+
 ## [0.1.2] - 2026-07-22
 
 ### Added
@@ -67,5 +102,6 @@ Initial public release.
 - No secrets are committed; all configuration is supplied at runtime via a local,
   gitignored `.env`. Trivy fails CI on CRITICAL misconfigurations.
 
+[0.2.0]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/NX1X/self-hosted-ghost-blog/releases/tag/v0.1.1
