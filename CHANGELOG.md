@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The documented attestation-verification command now passes `--bundle-from-oci`,
+  reading the signed bundle from GHCR instead of GitHub's attestation API. The
+  API path redirects to an Azure blob host that some networks cannot reach, so
+  the documented command failed on transport rather than on trust. Both paths
+  check the same signature. Requires `gh` 2.49+.
+
 ## [0.2.1] - 2026-07-28
 
 ### Added
@@ -129,6 +139,7 @@ Initial public release.
 - No secrets are committed; all configuration is supplied at runtime via a local,
   gitignored `.env`. Trivy fails CI on CRITICAL misconfigurations.
 
+[Unreleased]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.2.1...HEAD
 [0.2.1]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.1.1...v0.1.2

@@ -205,8 +205,16 @@ SBOM plus in-toto build provenance:
 ```bash
 gh attestation verify \
   oci://ghcr.io/nx1x/self-hosted-ghost-blog/tinybird:edge \
-  --repo NX1X/self-hosted-ghost-blog
+  --repo NX1X/self-hosted-ghost-blog \
+  --bundle-from-oci
 ```
+
+`--bundle-from-oci` reads the signed Sigstore bundle from GHCR, where the
+publish workflow stores it next to the image (`push-to-registry: true`). Without
+that flag `gh` fetches the bundle from GitHub's attestation API instead, which
+redirects to an Azure blob host that some networks cannot reach - the
+verification then fails on transport, not on trust. Reading it from the registry
+avoids that hop entirely and checks the same signature. Requires `gh` 2.49+.
 
 To build it yourself rather than pulling it, use the overlay:
 
