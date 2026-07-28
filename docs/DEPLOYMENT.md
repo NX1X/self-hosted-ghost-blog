@@ -93,7 +93,35 @@ and prunes anything older than 30 days. Adjust the schedule, prefix, and
 Restore is the reverse: pull the bundle from R2, `gunzip` the SQL dump into the
 `db` container, and untar the content into the Ghost content volume.
 
-## 4. Alternative: WARP instead of a tunnel host
+## 4. Upgrading MySQL
+
+The stack pins MySQL to the LTS track (currently `8.4`). Two things make a
+MySQL bump different from every other image update here:
+
+- **It is one-way.** MySQL supports in-place upgrade but not downgrade. Rolling
+  back the tag will not roll back the data directory, so take a backup and
+  confirm it restores before you deploy a new major/minor.
+- **Authentication changed in 8.4.** The `mysql_native_password` plugin is no
+  longer enabled by default. A database user created under an older server with
+  that plugin will fail to authenticate after the upgrade, and Ghost will not
+  connect. Check before upgrading:
+
+  ```bash
+  docker compose exec db mysql -u root -p \
+    -e "SELECT user, host, plugin FROM mysql.user WHERE user NOT LIKE 'mysql.%';"
+  ```
+
+  Anything still on `mysql_native_password` should be migrated first:
+
+  ```bash
+  docker compose exec db mysql -u root -p \
+    -e "ALTER USER 'ghost'@'%' IDENTIFIED WITH caching_sha2_password BY '<password>';"
+  ```
+
+Renovate is capped below MySQL 9 so it cannot move you onto an Innovation
+release on its own. Stepping to the next LTS is a deliberate change.
+
+## 5. Alternative: WARP instead of a tunnel host
 
 If your server sits on a private network reachable through your Cloudflare Zero
 Trust org (rather than behind a single published SSH hostname), put the runner
