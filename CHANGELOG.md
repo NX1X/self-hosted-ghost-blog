@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-07-28
+
+### Added
+
+- `docs/DEPLOYMENT.md` section on upgrading MySQL. Two things make it unlike any
+  other image update here: it is one-way (MySQL supports in-place upgrade but
+  **not** downgrade, so reverting the tag does not revert the data directory),
+  and 8.4 no longer enables `mysql_native_password` by default, so a database
+  user created under an older server fails to authenticate and Ghost cannot
+  connect. Includes the query to find affected users and the `ALTER USER` that
+  migrates them to `caching_sha2_password`.
+
+### Changed
+
+- MySQL moved to **8.4 LTS**. The previous automated bump had landed on 8.3, an
+  Innovation release that is already end-of-life; 8.4 is the LTS line. Renovate
+  is now capped below 9 so it cannot drift onto an Innovation release again, and
+  MySQL updates no longer auto-merge.
+- README documents the pinned version of every service in a table, replacing the
+  stack badges that had drifted - they still advertised MySQL 8.0 and nginx 1.28
+  while `compose.yml` ran 8.3 and 1.29.
+
 ## [0.2.0] - 2026-07-28
 
 ### Added
@@ -26,14 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- MySQL moved to **8.4 LTS**. The previous automated bump had landed on 8.3, an
-  Innovation release that is already end-of-life; 8.4 is the LTS line. Renovate
-  is now capped below 9 so it cannot drift onto an Innovation release again, and
-  MySQL updates no longer auto-merge. Note that MySQL supports in-place upgrade
-  but **not** downgrade - back up the data volume before deploying this.
-- README now documents the pinned version of every service in a table, replacing
-  the stack badges that had drifted (they still advertised MySQL 8.0 and nginx
-  1.28 while `compose.yml` ran 8.3 and 1.29).
 - `tinybird-login` and `tinybird-deploy` reference the published GHCR image
   instead of a local `build:` context. Previously `docker compose up` on the
   production server compiled the image there on every deploy - unscanned, not
@@ -115,6 +129,7 @@ Initial public release.
 - No secrets are committed; all configuration is supplied at runtime via a local,
   gitignored `.env`. Trivy fails CI on CRITICAL misconfigurations.
 
+[0.2.1]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/NX1X/self-hosted-ghost-blog/releases/tag/v0.1.1
