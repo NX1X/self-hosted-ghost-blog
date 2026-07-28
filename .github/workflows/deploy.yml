@@ -58,9 +58,13 @@ jobs:
           # Send only what the server needs to run the stack. .env, ssl/ and
           # data/ live on the server and are protected from --delete so CI can
           # never overwrite secrets, TLS material, or the live database/uploads.
+          # compose.build.yml and tinybird/ are the escape hatch: the Tinybird
+          # helper image is normally pulled from GHCR, but shipping the build
+          # context lets an operator rebuild it on the box if the registry is
+          # unreachable.
           rsync -az --delete \
             --exclude='.env' --exclude='ssl' --exclude='data' \
-            compose.yml env.example nginx mysql-init tinybird \
+            compose.yml compose.build.yml env.example nginx mysql-init tinybird \
             "${SSH_USER}@${SSH_HOST}:${DEPLOY_DIR}/"
 
       - name: Pull images and restart
@@ -68,7 +72,28 @@ jobs:
           SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
           SSH_USER: ${{ vars.DEPLOY_SSH_USER || 'deploy' }}
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/opt/ghost-blog' }}
+          # Space-separated compose profiles whose images are pulled (not started).
+          # Set the DEPLOY_PULL_PROFILES repository variable to override.
+          PULL_PROFILES: ${{ vars.DEPLOY_PULL_PROFILES || 'analytics activitypub' }}
         run: |
+          # A bare `docker compose pull` only covers profile-less services, so
+          # the profiled images - including the self-published Tinybird helper -
+          # were never refreshed by CD. Pull them explicitly here.
+          read -ra profiles <<< "${PULL_PROFILES}"
+          profile_args=""
+          for p in "${profiles[@]}"; do
+            profile_args="${profile_args} --profile ${p}"
+          done
+
+          # `up` deliberately runs WITHOUT profiles, so only the always-on
+          # services are (re)started. Everything behind a profile is a one-shot
+          # job - tinybird-login is an interactive Tinybird auth step and
+          # activitypub-migrate applies schema migrations - and re-running those
+          # on every deploy would be wrong. They stay operator-triggered, but
+          # their images are now already on the box and current.
+          #
+          # `image prune -f` removes dangling (untagged) images only, so the
+          # freshly pulled profile images survive it.
           # shellcheck disable=SC2029  # remote command intentionally expands on the runner
           ssh "${SSH_USER}@${SSH_HOST}" \
-            "cd '${DEPLOY_DIR}' && docker compose pull && docker compose up -d --remove-orphans && docker image prune -f"
+            "cd '${DEPLOY_DIR}' && docker compose${profile_args} pull && docker compose up -d --remove-orphans && docker image prune -f"

@@ -137,6 +137,7 @@ Full setup, secrets, and the WARP alternative: [docs/DEPLOYMENT.md](docs/DEPLOYM
 ```
 .
 ├── compose.yml              # Docker Compose services (digest-pinned, hardened)
+├── compose.build.yml        # Optional overlay to build the Tinybird image locally
 ├── env.example              # Environment variable template
 ├── nginx/nginx.conf         # Nginx reverse proxy config
 ├── mysql-init/              # MySQL initialization scripts
@@ -164,6 +165,31 @@ scanned. They run on push, on pull requests, and on a weekly schedule.
 | `codeql.yml` | [CodeQL](https://codeql.github.com/) | Semantic SAST (security-extended) on the JS migration script and the Actions workflows. |
 | `zizmor.yml` | [zizmor](https://github.com/woodruffw/zizmor) | Audits the workflows themselves for script injection, over-broad permissions and credential persistence. |
 | `dependency-review.yml` | [dependency-review](https://github.com/actions/dependency-review-action) | Blocks PRs that add vulnerable or disallowed-license dependencies. |
+| `publish-tinybird.yml` | Buildx, Trivy, [attest-build-provenance](https://github.com/actions/attest-build-provenance) | Builds `tinybird/Dockerfile`, scans it, and publishes a multi-arch image with an SBOM and signed provenance to GHCR. |
+
+### The Tinybird helper image
+
+Every service in `compose.yml` is an upstream image except one: the Tinybird
+CLI helper built from [`tinybird/Dockerfile`](tinybird/Dockerfile). It is
+published to GHCR as
+[`ghcr.io/nx1x/self-hosted-ghost-blog/tinybird`](https://github.com/NX1X/self-hosted-ghost-blog/pkgs/container/self-hosted-ghost-blog%2Ftinybird)
+so the production server pulls it like everything else instead of running
+`pip install` on each deploy. It is built for `linux/amd64` and `linux/arm64`,
+scanned by Trivy before push (CRITICAL blocks the publish), and shipped with an
+SBOM plus in-toto build provenance:
+
+```bash
+gh attestation verify \
+  oci://ghcr.io/nx1x/self-hosted-ghost-blog/tinybird:edge \
+  --repo NX1X/self-hosted-ghost-blog
+```
+
+To build it yourself rather than pulling it, use the overlay:
+
+```bash
+docker compose -f compose.yml -f compose.build.yml build
+docker compose -f compose.yml -f compose.build.yml --profile analytics up
+```
 
 ### Renovate setup
 
@@ -180,6 +206,9 @@ Image update strategy:
   Renovate pins and bumps their immutable `@sha256` digest instead.
 - Every image is already pinned to an immutable `@sha256` digest; Renovate keeps
   those digests current and opens a PR for each change.
+- The self-published `tinybird` image is exempt from the 14-day cooldown that
+  guards third-party updates - its digest is produced by this repo's own
+  scanned, attested build - so Renovate pins it as soon as it is published.
 
 ## Disclaimer
 

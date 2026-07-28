@@ -198,9 +198,13 @@ services:
 
   tinybird-login:
     <<: *hardening
-    build:
-      context: ./tinybird
-      dockerfile: Dockerfile
+    # Built from ./tinybird by .github/workflows/publish-tinybird.yml and
+    # scanned before publish, so the server pulls it like every other service
+    # instead of compiling the Tinybird CLI on each deploy. Renovate pins and
+    # bumps the @sha256 digest.
+    # To build it yourself instead:
+    #   docker compose -f compose.yml -f compose.build.yml build
+    image: ghcr.io/nx1x/self-hosted-ghost-blog/tinybird:edge
     working_dir: /home/tinybird
     command: /usr/local/bin/tinybird-login
     volumes:
@@ -238,9 +242,8 @@ services:
 
   tinybird-deploy:
     <<: *hardening
-    build:
-      context: ./tinybird
-      dockerfile: Dockerfile
+    # Same image as tinybird-login; see the note there.
+    image: ghcr.io/nx1x/self-hosted-ghost-blog/tinybird:edge
     working_dir: /data/tinybird
     command: >
       sh -c "

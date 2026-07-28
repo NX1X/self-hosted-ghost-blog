@@ -1,0 +1,178 @@
+name: Publish Tinybird image
+
+# Builds tinybird/Dockerfile and publishes it to GHCR.
+#
+# Why: this is the only image in the stack that isn't pulled from upstream.
+# Before this workflow existed, `docker compose up` on the production server had
+# to build it there - which meant a build toolchain on the box, a fresh
+# `pip install` of the Tinybird CLI on every deploy, no vulnerability scan, and
+# no way to pin the result by digest. Publishing it here makes the helper image
+# behave exactly like every other service in compose.yml: pulled, digest-pinned,
+# scanned, and Renovate-tracked.
+#
+# Pull requests build and scan but never push. Only pushes to main publish.
+#
+# NOTE: a GHCR package is created PRIVATE by default, even from a public repo.
+# After the first successful run, make it public once:
+#   gh api -X PATCH /user/packages/container/self-hosted-ghost-blog%2Ftinybird \
+#     -f visibility=public
+# Otherwise `docker compose pull` on the server needs registry credentials.
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "tinybird/**"
+      - ".github/workflows/publish-tinybird.yml"
+  pull_request:
+    paths:
+      - "tinybird/**"
+      - ".github/workflows/publish-tinybird.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-tinybird-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Build, scan, publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write # push to GHCR
+      id-token: write # provenance attestation signing
+      attestations: write # write to the GitHub attestation store
+      security-events: write # upload the Trivy SARIF
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      # github.repository is mixed-case (NX1X/...) but registry paths must be
+      # lowercase. Read it via env rather than inlining the expression so the
+      # run block can never be a template-injection sink.
+      - name: Resolve image name
+        id: img
+        env:
+          REPO: ${{ github.repository }}
+        run: echo "name=ghcr.io/${REPO,,}/tinybird" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ steps.img.outputs.name }}
+          tags: |
+            type=raw,value=edge,enable={{is_default_branch}}
+            type=sha,format=long
+          labels: |
+            org.opencontainers.image.title=tinybird
+            org.opencontainers.image.description=Tinybird CLI helper for the self-hosted Ghost analytics profile
+
+      # Scan gate runs before the push, so a CRITICAL finding never reaches the
+      # registry. Single-arch and loaded into the local daemon because Trivy
+      # scans one platform at a time; the multi-arch build below reuses the
+      # layer cache, so this costs cache-warming, not a second full build.
+      - name: Build amd64 image for scanning
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ./tinybird
+          file: ./tinybird/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: localhost/tinybird:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy image scan (SARIF)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: localhost/tinybird:scan
+          scanners: vuln,secret
+          format: sarif
+          output: trivy-tinybird.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "0"
+
+      - name: Upload image SARIF
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4
+        if: always()
+        with:
+          sarif_file: trivy-tinybird.sarif
+          category: trivy-tinybird-image
+
+      # Hard gate. HIGH stays informational in the Security tab (above) so a
+      # base-image CVE with no fix available can't block every deploy.
+      - name: Trivy gate (fail on CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: localhost/tinybird:scan
+          scanners: vuln,secret
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@371161bbe7024a29a25c5e19bfcbc0804fe9ad2c # v4.5.2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (multi-arch)
+        id: push
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ./tinybird
+          file: ./tinybird/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          sbom: true
+          provenance: mode=max
+
+      # In-toto provenance in GitHub's attestation store, on top of the
+      # registry-side attestations buildx just pushed. Verify with:
+      #   gh attestation verify oci://<image>@<digest> --repo NX1X/self-hosted-ghost-blog
+      - name: Attest build provenance
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-name: ${{ steps.img.outputs.name }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Summary
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE: ${{ steps.img.outputs.name }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          {
+            echo "### Tinybird image published"
+            echo
+            echo "\`${IMAGE}@${DIGEST}\`"
+            echo
+            echo "Renovate pins this digest into \`compose.yml\` on its next run."
+          } >> "$GITHUB_STEP_SUMMARY"
