@@ -210,7 +210,7 @@ services:
     # bumps the @sha256 digest.
     # To build it yourself instead:
     #   docker compose -f compose.yml -f compose.build.yml build
-    image: ghcr.io/nx1x/self-hosted-ghost-blog/tinybird:edge@sha256:0b9a33fd867d3100f924a16fc2f93b2032f289f4aec936146a763b679116fb4f
+    image: ghcr.io/nx1x/self-hosted-ghost-blog/tinybird:edge@sha256:28876b88cc48fb00e7aaf7aa16b1379e78faf6b1c85ba32b1ceaccdd3753edf7
     working_dir: /home/tinybird
     command: /usr/local/bin/tinybird-login
     volumes:
@@ -249,7 +249,7 @@ services:
   tinybird-deploy:
     <<: *hardening
     # Same image as tinybird-login; see the note there.
-    image: ghcr.io/nx1x/self-hosted-ghost-blog/tinybird:edge@sha256:0b9a33fd867d3100f924a16fc2f93b2032f289f4aec936146a763b679116fb4f
+    image: ghcr.io/nx1x/self-hosted-ghost-blog/tinybird:edge@sha256:28876b88cc48fb00e7aaf7aa16b1379e78faf6b1c85ba32b1ceaccdd3753edf7
     working_dir: /data/tinybird
     command: >
       sh -c "
