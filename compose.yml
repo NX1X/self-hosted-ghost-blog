@@ -141,7 +141,7 @@ services:
   traffic-analytics:
     <<: *hardening
     # Pinned to a version tag + immutable digest. Renovate bumps both together.
-    image: ghost/traffic-analytics:1.0.312@sha256:fda3abbcda76cc9d13a721a50f6171c456701bf1091e49d55639ad3a9ff0914b  # https://hub.docker.com/r/ghost/traffic-analytics
+    image: ghost/traffic-analytics:1.0.422@sha256:cf0bf476efd96bba6cbd5dbf62d8aace90e6318ee86b40f0b2ca03a66ae76283  # https://hub.docker.com/r/ghost/traffic-analytics
     restart: always
     expose:
       - "3000"
