@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renovate now automerges every update once required CI passes, including major
   updates, security updates and MySQL updates inside the `< 9` cap. Normal
   updates keep the 14-day cooldown. Security updates have no cooldown.
+- The Tinybird image scan now uploads only fixable CRITICAL and HIGH findings to
+  code scanning. It uploaded every severity before, and findings with no fix.
 
 ### Fixed
 
