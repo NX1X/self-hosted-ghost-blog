@@ -25,7 +25,7 @@
     "minimumReleaseAge": null,
     "labels": ["security"],
     "addLabels": ["security"],
-    "automerge": false
+    "automerge": true
   },
   "lockFileMaintenance": {
     "enabled": true,
@@ -40,18 +40,17 @@
       "automerge": true
     },
     {
-      "description": "Major updates: keep as separate PRs, label them, and require a human to review and merge (potential breaking changes).",
+      "description": "Major updates: keep as separate PRs and label them, so one breaking change cannot hold back the weekly batch. They automerge like every other update, after the 14-day cooldown and once CI is green.",
       "matchUpdateTypes": ["major"],
       "groupName": null,
-      "automerge": false,
+      "automerge": true,
       "addLabels": ["major"]
     },
     {
-      "description": "Keep MySQL on the LTS track. Oracle alternates LTS releases (8.4, supported for years) with Innovation releases (8.1-8.3, 9.x) that reach EOL as soon as the next one ships. Without this constraint Renovate happily upgrades to an Innovation release - it already moved this repo from 8.0 LTS to the EOL 8.3. Capping below 9 keeps it on 8.4; moving to the next LTS is a deliberate human step, since MySQL supports in-place upgrade but NOT downgrade.",
+      "description": "Keep MySQL on the LTS track. Oracle alternates LTS releases (8.4, supported for years) with Innovation releases (8.1-8.3, 9.x) that reach EOL as soon as the next one ships. Without this constraint Renovate happily upgrades to an Innovation release - it already moved this repo from 8.0 LTS to the EOL 8.3. Capping below 9 keeps it on 8.4; moving to the next LTS is a deliberate human step, since MySQL supports in-place upgrade but NOT downgrade. Updates inside the cap automerge like every other update.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["mysql"],
       "allowedVersions": "<9",
-      "automerge": false,
       "addLabels": ["database"]
     },
     {

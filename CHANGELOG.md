@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API path redirects to an Azure blob host that some networks cannot reach, so
   the documented command failed on transport rather than on trust. Both paths
   check the same signature. Requires `gh` 2.49+.
+- Renovate now automerges every update once required CI passes, including major
+  updates, security updates and MySQL updates inside the `< 9` cap. Normal
+  updates keep the 14-day cooldown. Security updates have no cooldown.
 
 ### Fixed
 

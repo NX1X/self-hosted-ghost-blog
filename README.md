@@ -230,6 +230,12 @@ configured entirely through [`.github/renovate.json`](.github/renovate.json). In
 the app on the repository and it opens update PRs automatically - no self-hosted
 workflow or token to manage.
 
+Renovate merges its own PRs once the required CI checks pass. This applies to
+every update type, including majors:
+
+- Normal updates wait for a 14-day cooldown.
+- Security updates have no cooldown, so they merge as soon as CI is green.
+
 Image update strategy:
 
 - `nginx`, `ghost`, `mysql`, `ghost/traffic-analytics` are pinned to version
