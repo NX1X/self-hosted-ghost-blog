@@ -7,11 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-31
+
 ### Fixed
 
 - The nginx healthcheck now passes on a working server. The old check searched
   the output of `wget --quiet`, which is empty, so nginx always showed as
   unhealthy.
+
+### Removed
+
+- The `ghcr.io/nx1x/self-hosted-ghost-blog/tinybird` image is deleted from GHCR.
+  v0.3.0 and later do not use it. On v0.2.1 or older, the `analytics` profile can
+  no longer pull it, so upgrade and follow the steps under 0.3.0.
 
 ## [0.3.0] - 2026-10-31
 
@@ -160,7 +168,8 @@ Initial public release.
 - No secrets are committed; all configuration is supplied at runtime via a local,
   gitignored `.env`. Trivy fails CI on CRITICAL misconfigurations.
 
-[Unreleased]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.1.2...v0.2.0
