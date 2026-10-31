@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the documented command failed on transport rather than on trust. Both paths
   check the same signature. Requires `gh` 2.49+.
 
+### Fixed
+
+- The Tinybird helper image now replaces the PyJWT version that the CLI pins
+  (2.9.0, CVE-2026-102268) with 2.15.1, applies Debian security updates at build
+  time and removes the uv cache, so the Trivy gate in `publish-tinybird.yml`
+  passes and the image can publish again.
+- The `HEALTHCHECK` in `tinybird/Dockerfile` uses JSON notation, which Hadolint
+  2.15 requires (DL3025).
+
 ## [0.2.1] - 2026-07-28
 
 ### Added
