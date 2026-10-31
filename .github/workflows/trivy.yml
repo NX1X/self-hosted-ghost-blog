@@ -1,7 +1,7 @@
 name: Trivy
 
 # Scans for:
-#   - Misconfigurations in compose.yml, the Tinybird Dockerfile, and other IaC
+#   - Misconfigurations in compose.yml and other IaC
 #   - Vulnerable OS/library packages referenced in the repo (fs scan)
 #   - Leaked secrets (defence in depth alongside Gitleaks)
 # Results are uploaded to the GitHub Security tab as SARIF.

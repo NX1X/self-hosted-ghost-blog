@@ -16,9 +16,6 @@ pids
 # Docker bind-mount data (Ghost uploads, MySQL data)
 data/
 
-# Tinybird local auth token
-.tinyb
-
 # TLS material - provisioned on the server, never committed
 ssl/*.pem
 ssl/*.crt

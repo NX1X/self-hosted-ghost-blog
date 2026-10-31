@@ -49,9 +49,7 @@ body:
       label: Which configuration?
       options:
         - Core (Ghost + MySQL + nginx)
-        - analytics profile
         - activitypub profile
-        - Multiple / all profiles
     validations:
       required: true
 

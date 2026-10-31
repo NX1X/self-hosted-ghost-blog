@@ -52,7 +52,7 @@ On the server:
 | `DEPLOY_SSH_HOST` | secret | deploy, backup |
 | `DEPLOY_SSH_USER` | variable (default `deploy`) | deploy, backup |
 | `DEPLOY_DIR` | variable (default `/opt/ghost-blog`) | deploy, backup |
-| `DEPLOY_PULL_PROFILES` | variable (default `analytics activitypub`) | deploy |
+| `DEPLOY_PULL_PROFILES` | variable (default `activitypub`) | deploy |
 | `DATABASE_ROOT_PASSWORD` | secret | backup (must match server `.env`) |
 | `CF_ACCOUNT_ID` | secret | backup |
 | `R2_ACCESS_KEY_ID` | secret | backup |
@@ -65,14 +65,12 @@ reviewers there if you want a manual approval gate before each deploy.
 ### What a deploy starts
 
 The deploy pulls images for the profiles listed in `DEPLOY_PULL_PROFILES`, but
-starts only the always-on services. Everything behind a profile is a one-shot
-job - `tinybird-login` is an interactive Tinybird auth step and
-`activitypub-migrate` applies schema migrations - so re-running them on every
-deploy would be wrong. Their images are kept current on the server, and you
-trigger the jobs yourself when you need them:
+starts only the always-on services. `activitypub-migrate` applies schema
+migrations, so re-running it on every deploy would be wrong. Its image is kept
+current on the server, and you start it yourself when you need it:
 
 ```bash
-docker compose --profile analytics up
+docker compose --profile activitypub up
 ```
 
 Set `DEPLOY_PULL_PROFILES` to an empty value to skip pulling profiled images

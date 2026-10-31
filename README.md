@@ -1,6 +1,6 @@
 # Self-Hosted Ghost CMS with Docker
 
-Production-ready Ghost CMS deployment with Docker Compose, featuring nginx reverse proxy, optional analytics, and ActivityPub federation.
+Production-ready Ghost CMS deployment with Docker Compose, featuring nginx reverse proxy and ActivityPub federation.
 
 [![Release](https://img.shields.io/github/v/release/NX1X/self-hosted-ghost-blog?sort=semver&color=blue)](https://github.com/NX1X/self-hosted-ghost-blog/releases)
 [![Last commit](https://img.shields.io/github/last-commit/NX1X/self-hosted-ghost-blog)](https://github.com/NX1X/self-hosted-ghost-blog/commits/main)
@@ -37,7 +37,6 @@ to do it.
 ```
 Internet → CDN / Tunnel → Nginx → Ghost CMS
                                 → ActivityPub (optional)
-                                → Tinybird Analytics (optional)
 ```
 
 | Service | Pinned version | Role |
@@ -45,9 +44,7 @@ Internet → CDN / Tunnel → Nginx → Ghost CMS
 | **Ghost** | `6-alpine` | CMS application (port 2368, internal only) |
 | **MySQL** | `8.4` (LTS) | Database backend with health checks |
 | **Nginx** | `1.29-alpine` | Reverse proxy: rate limiting, bot protection, security headers |
-| **traffic-analytics** | `1.0.284` | Analytics proxy (`analytics` profile) |
 | **ActivityPub** | rolling `sha-` tag | Federated social networking (`activitypub` profile) |
-| **Tinybird CLI helper** | `edge` from GHCR | Analytics setup (`analytics` profile) |
 
 [`compose.yml`](compose.yml) is the source of truth - every entry above is
 additionally pinned to an immutable `@sha256` digest there.
@@ -78,15 +75,25 @@ All configuration is done via environment variables in `.env`. Key settings:
 ### Optional Profiles
 
 ```bash
-# Include analytics
-docker compose --profile=analytics up -d
-
 # Include ActivityPub federation
 docker compose --profile=activitypub up -d
-
-# Include both
-COMPOSE_PROFILES=analytics,activitypub docker compose up -d
 ```
+
+### Web Analytics
+
+This stack has no built-in web analytics, because Ghost's native analytics need
+a Tinybird backend. Use a script-based tool instead. [Umami](https://umami.is)
+works through Ghost code injection and needs no extra container here:
+
+1. Create a website in Umami Cloud or in your own Umami install.
+2. Copy the tracking script from the Umami website settings.
+3. Paste the script into the site header in Ghost Admin, under code injection.
+
+```html
+<script defer src="https://cloud.umami.is/script.js" data-website-id="YOUR_WEBSITE_ID"></script>
+```
+
+If you self-host Umami, change `src` to your own Umami URL.
 
 ## Common Commands
 
@@ -143,14 +150,12 @@ Full setup, secrets, and the WARP alternative: [docs/DEPLOYMENT.md](docs/DEPLOYM
 ```
 .
 ├── compose.yml              # Docker Compose services (digest-pinned, hardened)
-├── compose.build.yml        # Optional overlay to build the Tinybird image locally
 ├── env.example              # Environment variable template
 ├── nginx/nginx.conf         # Nginx reverse proxy config
 ├── mysql-init/              # MySQL initialization scripts
 ├── scripts/
 │   ├── migrate.sh           # Ghost CLI migration tool
 │   └── config-to-env.js     # Config converter
-├── tinybird/                # Analytics setup tools
 ├── ssl/                     # SSL certificates (not committed)
 ├── docs/                    # Deployment guide
 └── .github/
@@ -166,13 +171,12 @@ scanned. They run on push, on pull requests, and on a weekly schedule.
 | Workflow | Tool | Purpose |
 |----------|------|---------|
 | `gitleaks.yml` | [Gitleaks](https://github.com/gitleaks/gitleaks) | Scans the full git history and PRs for committed secrets. |
-| `trivy.yml` | [Trivy](https://trivy.dev/) | Scans `compose.yml`, the Dockerfile and the filesystem for CVEs, misconfigurations and secrets; uploads results to the Security tab. |
-| `lint.yml` | ShellCheck, Hadolint, actionlint | Lints shell scripts, the Dockerfile, the workflows, and validates `compose.yml`. |
+| `trivy.yml` | [Trivy](https://trivy.dev/) | Scans `compose.yml` and the filesystem for CVEs, misconfigurations and secrets; uploads results to the Security tab. |
+| `lint.yml` | ShellCheck, actionlint | Lints shell scripts and the workflows, and validates `compose.yml`. |
 | `codeql.yml` | [CodeQL](https://codeql.github.com/) | Semantic SAST (security-extended) on the JS migration script and the Actions workflows. |
 | `zizmor.yml` | [zizmor](https://github.com/woodruffw/zizmor) | Audits the workflows themselves for script injection, over-broad permissions and credential persistence. |
 | `dependency-review.yml` | [dependency-review](https://github.com/actions/dependency-review-action) | Blocks PRs that add vulnerable or disallowed-license dependencies. |
-| `publish-tinybird.yml` | Buildx, Trivy, [attest-build-provenance](https://github.com/actions/attest-build-provenance) | Builds `tinybird/Dockerfile`, scans it, and publishes a multi-arch image with an SBOM and signed provenance to GHCR. |
-| `release.yml` | `gh`, Buildx | On a `v*` tag: publishes a GitHub Release using the matching `CHANGELOG.md` section, and points versioned GHCR tags at the already published image. |
+| `release.yml` | `gh` | On a `v*` tag: publishes a GitHub Release using the matching `CHANGELOG.md` section. |
 
 ### Cutting a release
 
@@ -187,41 +191,7 @@ scanned. They run on push, on pull requests, and on a weekly schedule.
 `release.yml` takes it from there. It refuses to publish if `CHANGELOG.md` has
 no content for that version, so a tag can never ship with empty or stale notes -
 and since the tag ruleset blocks tag updates and deletion, that check runs
-before anything is published. It then points `X.Y.Z` and `X.Y` at the existing
-Tinybird image digest, so a versioned tag is byte-identical to the image that
-was already scanned and attested; nothing is rebuilt.
-
-### The Tinybird helper image
-
-Every service in `compose.yml` is an upstream image except one: the Tinybird
-CLI helper built from [`tinybird/Dockerfile`](tinybird/Dockerfile). It is
-published to GHCR as
-[`ghcr.io/nx1x/self-hosted-ghost-blog/tinybird`](https://github.com/NX1X/self-hosted-ghost-blog/pkgs/container/self-hosted-ghost-blog%2Ftinybird)
-so the production server pulls it like everything else instead of running
-`pip install` on each deploy. It is built for `linux/amd64` and `linux/arm64`,
-scanned by Trivy before push (CRITICAL blocks the publish), and shipped with an
-SBOM plus in-toto build provenance:
-
-```bash
-gh attestation verify \
-  oci://ghcr.io/nx1x/self-hosted-ghost-blog/tinybird:edge \
-  --repo NX1X/self-hosted-ghost-blog \
-  --bundle-from-oci
-```
-
-`--bundle-from-oci` reads the signed Sigstore bundle from GHCR, where the
-publish workflow stores it next to the image (`push-to-registry: true`). Without
-that flag `gh` fetches the bundle from GitHub's attestation API instead, which
-redirects to an Azure blob host that some networks cannot reach - the
-verification then fails on transport, not on trust. Reading it from the registry
-avoids that hop entirely and checks the same signature. Requires `gh` 2.49+.
-
-To build it yourself rather than pulling it, use the overlay:
-
-```bash
-docker compose -f compose.yml -f compose.build.yml build
-docker compose -f compose.yml -f compose.build.yml --profile analytics up
-```
+before anything is published.
 
 ### Renovate setup
 
@@ -238,7 +208,7 @@ every update type, including majors:
 
 Image update strategy:
 
-- `nginx`, `ghost`, `mysql`, `ghost/traffic-analytics` are pinned to version
+- `nginx`, `ghost`, `mysql` are pinned to version
   tags, so Renovate proposes tracked upgrades with changelogs.
 - `mysql` is held to the **LTS track** (`< 9`). Oracle ships Innovation releases
   (8.1-8.3, 9.x) that reach EOL as soon as the next one lands, alongside LTS
@@ -250,9 +220,6 @@ Image update strategy:
   Renovate pins and bumps their immutable `@sha256` digest instead.
 - Every image is already pinned to an immutable `@sha256` digest; Renovate keeps
   those digests current and opens a PR for each change.
-- The self-published `tinybird` image is exempt from the 14-day cooldown that
-  guards third-party updates - its digest is produced by this repo's own
-  scanned, attested build - so Renovate pins it as soon as it is published.
 
 ## Disclaimer
 
