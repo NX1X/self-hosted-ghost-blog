@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The nginx healthcheck now passes on a working server. The old check searched
+  the output of `wget --quiet`, which is empty, so nginx always showed as
+  unhealthy.
+
 ## [0.3.0] - 2026-10-31
 
 ### Changed
