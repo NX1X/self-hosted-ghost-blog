@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-31
+
 ### Changed
 
 - Renovate now automerges every update once required CI passes, including major
@@ -152,7 +154,8 @@ Initial public release.
 - No secrets are committed; all configuration is supplied at runtime via a local,
   gitignored `.env`. Trivy fails CI on CRITICAL misconfigurations.
 
-[Unreleased]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/NX1X/self-hosted-ghost-blog/compare/v0.1.1...v0.1.2
