@@ -58,7 +58,6 @@ services:
 
   ghost:
     <<: *hardening
-    # Keep this in sync with the tinybird-sync container image below
     image: ghost:6-alpine@sha256:29886ddcf4ae5c005099c8ade34707d7c8d5d71b9dc5e31473c632b27b2ea18a  # https://hub.docker.com/_/ghost
     restart: always
     expose:
@@ -83,11 +82,6 @@ services:
       database__connection__user: ${DATABASE_USER:-ghost}
       database__connection__password: ${DATABASE_PASSWORD:?DATABASE_PASSWORD environment variable is required}
       database__connection__database: ghost
-      tinybird__tracker__endpoint: https://${DOMAIN:?DOMAIN environment variable is required}/.ghost/analytics/api/v1/page_hit
-      tinybird__adminToken: ${TINYBIRD_ADMIN_TOKEN:-}
-      tinybird__workspaceId: ${TINYBIRD_WORKSPACE_ID:-}
-      tinybird__tracker__datasource: analytics_events
-      tinybird__stats__endpoint: ${TINYBIRD_API_URL:-https://api.tinybird.co}
     healthcheck:
       test: ["CMD-SHELL", "wget --server-response --spider --quiet http://127.0.0.1:2368/ 2>&1 | grep -E 'HTTP.*200|HTTP.*301|HTTP.*302' || exit 1"]
       interval: 30s
@@ -138,32 +132,6 @@ services:
     networks:
       - internal
 
-  traffic-analytics:
-    <<: *hardening
-    # Pinned to a version tag + immutable digest. Renovate bumps both together.
-    image: ghost/traffic-analytics:1.0.489@sha256:8c3a896dde3f66cceb252729ea7cf131f09eea3dd4c7008883f2ab5c44d1f9d4  # https://hub.docker.com/r/ghost/traffic-analytics
-    restart: always
-    expose:
-      - "3000"
-    volumes:
-      - traffic_analytics_data:/data
-    environment:
-      NODE_ENV: production
-      PROXY_TARGET: ${TINYBIRD_API_URL:-https://api.tinybird.co}/v0/events
-      SALT_STORE_TYPE: ${SALT_STORE_TYPE:-file}
-      SALT_STORE_FILE_PATH: /data/salts.json
-      TINYBIRD_TRACKER_TOKEN: ${TINYBIRD_TRACKER_TOKEN:-}
-      LOG_LEVEL: debug
-    healthcheck:
-      test: ["CMD-SHELL", "wget --server-response --spider --quiet --timeout=2 http://127.0.0.1:3000/ 2>&1 | grep -E 'HTTP.*200|HTTP.*404' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    profiles: [analytics]
-    networks:
-      - edge
-
   activitypub:
     <<: *hardening
     # Rolling image (no semver tags published; only sha-<commit> tags exist, so
@@ -202,70 +170,6 @@ services:
 
   # Suporting Services
 
-  tinybird-login:
-    <<: *hardening
-    # Built from ./tinybird by .github/workflows/publish-tinybird.yml and
-    # scanned before publish, so the server pulls it like every other service
-    # instead of compiling the Tinybird CLI on each deploy. Renovate pins and
-    # bumps the @sha256 digest.
-    # To build it yourself instead:
-    #   docker compose -f compose.yml -f compose.build.yml build
-    image: ghcr.io/nx1x/self-hosted-ghost-blog/tinybird:edge@sha256:28876b88cc48fb00e7aaf7aa16b1379e78faf6b1c85ba32b1ceaccdd3753edf7
-    working_dir: /home/tinybird
-    command: /usr/local/bin/tinybird-login
-    volumes:
-      - tinybird_home:/home/tinybird
-      - tinybird_files:/data/tinybird
-    profiles: [analytics]
-    networks:
-      - internal
-    tty: false
-    restart: no
-
-  tinybird-sync:
-    <<: *hardening
-    # Do not alter this without updating the Ghost container as well
-    image: ghost:6-alpine@sha256:29886ddcf4ae5c005099c8ade34707d7c8d5d71b9dc5e31473c632b27b2ea18a
-    command: >
-      sh -c "
-        if [ -d /var/lib/ghost/current/core/server/data/tinybird ]; then
-          rm -rf /data/tinybird/*;
-          cp -rf /var/lib/ghost/current/core/server/data/tinybird/* /data/tinybird/;
-          echo 'Tinybird files synced into shared volume.';
-        else
-          echo 'Tinybird source directory not found.';
-        fi
-      "
-    volumes:
-      - tinybird_files:/data/tinybird
-    depends_on:
-      tinybird-login:
-        condition: service_completed_successfully
-    networks:
-      - internal
-    profiles: [analytics]
-    restart: no
-
-  tinybird-deploy:
-    <<: *hardening
-    # Same image as tinybird-login; see the note there.
-    image: ghcr.io/nx1x/self-hosted-ghost-blog/tinybird:edge@sha256:28876b88cc48fb00e7aaf7aa16b1379e78faf6b1c85ba32b1ceaccdd3753edf7
-    working_dir: /data/tinybird
-    command: >
-      sh -c "
-        tb-wrapper --cloud deploy
-      "
-    volumes:
-      - tinybird_home:/home/tinybird
-      - tinybird_files:/data/tinybird
-    depends_on:
-      tinybird-sync:
-        condition: service_completed_successfully
-    profiles: [analytics]
-    networks:
-      - internal
-    tty: true
-
   activitypub-migrate:
     <<: *hardening
     # Rolling image (no semver tags). Pinned to a sha-<commit> tag + digest.
@@ -279,11 +183,6 @@ services:
         condition: service_healthy
     profiles: [activitypub]
     restart: no
-
-volumes:
-  tinybird_files:
-  tinybird_home:
-  traffic_analytics_data:
 
 # Two-tier network: only nginx and the services it proxies sit on `edge`;
 # the database sits on `internal` and is unreachable from the edge tier.

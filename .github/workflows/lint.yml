@@ -1,6 +1,6 @@
 name: Lint
 
-# Static checks for the shell scripts, Dockerfile, compose file and workflows.
+# Static checks for the shell scripts, compose file and workflows.
 
 on:
   push:
@@ -29,23 +29,7 @@ jobs:
         env:
           SHELLCHECK_OPTS: -e SC1091
         with:
-          # tinybird/tb-wrapper and getTokens.sh have no .sh extension.
-          additional_files: "tb-wrapper getTokens.sh handleLogin.sh"
           severity: warning
-
-  hadolint:
-    name: Hadolint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-      - name: Hadolint
-        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
-        with:
-          dockerfile: tinybird/Dockerfile
-          failure-threshold: warning
 
   actionlint:
     name: actionlint
@@ -75,9 +59,5 @@ jobs:
           export DOMAIN=example.com
           export DATABASE_PASSWORD=ci-placeholder
           export DATABASE_ROOT_PASSWORD=ci-placeholder
-          docker compose --profile analytics --profile activitypub config --quiet
+          docker compose --profile activitypub config --quiet
           echo "compose.yml is valid."
-          # The local-build overlay must also compose cleanly on its own.
-          docker compose -f compose.yml -f compose.build.yml \
-            --profile analytics --profile activitypub config --quiet
-          echo "compose.yml + compose.build.yml is valid."

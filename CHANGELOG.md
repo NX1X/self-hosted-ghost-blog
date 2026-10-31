@@ -9,25 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The documented attestation-verification command now passes `--bundle-from-oci`,
-  reading the signed bundle from GHCR instead of GitHub's attestation API. The
-  API path redirects to an Azure blob host that some networks cannot reach, so
-  the documented command failed on transport rather than on trust. Both paths
-  check the same signature. Requires `gh` 2.49+.
 - Renovate now automerges every update once required CI passes, including major
   updates, security updates and MySQL updates inside the `< 9` cap. Normal
   updates keep the 14-day cooldown. Security updates have no cooldown.
-- The Tinybird image scan now uploads only fixable CRITICAL and HIGH findings to
-  code scanning. It uploaded every severity before, and findings with no fix.
 
-### Fixed
+### Removed
 
-- The Tinybird helper image now replaces the PyJWT version that the CLI pins
-  (2.9.0, CVE-2026-102268) with 2.15.1, applies Debian security updates at build
-  time and removes the uv cache, so the Trivy gate in `publish-tinybird.yml`
-  passes and the image can publish again.
-- The `HEALTHCHECK` in `tinybird/Dockerfile` uses JSON notation, which Hadolint
-  2.15 requires (DL3025).
+- **Breaking:** Tinybird and Ghost's native web analytics. This removes the
+  `analytics` profile, the `traffic-analytics`, `tinybird-login`, `tinybird-sync`
+  and `tinybird-deploy` services, the `/.ghost/analytics/` nginx route, the
+  `tinybird/` image and its publish workflow, `compose.build.yml`, and the GHCR
+  version tags on release. Ghost itself is not affected. The README now shows
+  how to add Umami with a script in Ghost code injection.
+
+  To upgrade, remove `analytics` from `COMPOSE_PROFILES`, delete the `TINYBIRD_*`
+  variables from `.env`, and run `docker compose down --remove-orphans` before
+  you start the stack. You can then delete the `tinybird_files`, `tinybird_home`
+  and `traffic_analytics_data` volumes. If you set `DEPLOY_PULL_PROFILES`, remove
+  `analytics` from it.
 
 ## [0.2.1] - 2026-07-28
 

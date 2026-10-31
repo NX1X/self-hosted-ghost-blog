@@ -31,7 +31,6 @@ docker compose logs -f ghost
 Optional profiles:
 
 ```bash
-docker compose --profile=analytics up -d
 docker compose --profile=activitypub up -d
 ```
 
