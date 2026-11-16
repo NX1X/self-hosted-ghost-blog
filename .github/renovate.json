@@ -17,8 +17,10 @@
   "prConcurrentLimit": 10,
   "rangeStrategy": "bump",
   "platformAutomerge": true,
-  "dependencyDashboardTitle": "Renovate Dependency Dashboard",
-  "dependencyDashboardOSVVulnerabilitySummary": "all",
+  "dependencyDashboard": {
+    "title": "Renovate Dependency Dashboard",
+    "osvVulnerabilitySummary": "all"
+  },
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "enabled": true,
